@@ -8,9 +8,9 @@ use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use tokio::time;
+
 const MAX_SAMPLES: usize = 100_000_000;
 
 #[derive(Parser, Debug)]
@@ -136,46 +136,43 @@ async fn run(
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
     let flag = Arc::new(AtomicBool::new(true));
 
-    let rt = Runtime::new().unwrap();
-    let handle = rt.spawn(async move {
-        for _ in 0..args.spawn {
-            tokio::spawn(async move {
-                let mut x: usize = 1;
-                loop {
-                    x = x.wrapping_mul(2);
-                    time::sleep(Duration::from_millis(1)).await;
-                }
-            });
-        }
+    for _ in 0..args.spawn {
+        tokio::spawn(async move {
+            let mut x: usize = 1;
+            loop {
+                x = x.wrapping_mul(2);
+                time::sleep(Duration::from_millis(1)).await;
+            }
+        });
+    }
 
-        if !args.wait {
-            run(args.address, args.size, args.interval, args.csv, args.spawn)
-                .await
-                .unwrap();
-        } else {
-            let c_duration = args.duration.clone();
-            let c_flag = flag.clone();
-            tokio::spawn(async move {
-                time::sleep(Duration::from_secs(c_duration)).await;
-                c_flag.store(false, Relaxed);
-            });
-
-            run_wait(
-                args.address,
-                args.size,
-                args.interval,
-                args.csv,
-                args.spawn,
-                flag,
-            )
+    if !args.wait {
+        run(args.address, args.size, args.interval, args.csv, args.spawn)
             .await
             .unwrap();
-        }
-    });
-    rt.block_on(handle).unwrap();
+    } else {
+        let c_duration = args.duration.clone();
+        let c_flag = flag.clone();
+        tokio::spawn(async move {
+            time::sleep(Duration::from_secs(c_duration)).await;
+            c_flag.store(false, Relaxed);
+        });
+
+        run_wait(
+            args.address,
+            args.size,
+            args.interval,
+            args.csv,
+            args.spawn,
+            flag,
+        )
+            .await
+            .unwrap();
+    }
 }
