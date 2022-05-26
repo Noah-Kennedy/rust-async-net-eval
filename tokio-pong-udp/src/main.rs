@@ -28,7 +28,7 @@ async fn run(addr: SocketAddr, size: usize) -> Result<(), Box<dyn std::error::Er
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let addr: SocketAddr = env::args()
         .nth(1)
